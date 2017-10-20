@@ -6,14 +6,26 @@ import de.fuberlin.wiwiss.silk.learning.active.ActiveLearningTask
 import de.fuberlin.wiwiss.silk.evaluation.{LinkageRuleEvaluator, ReferenceEntities}
 import de.fuberlin.wiwiss.silk.workspace.scripts.RunResult.Run
 import de.fuberlin.wiwiss.silk.learning.{LearningResult, LearningConfiguration}
+import de.fuberlin.wiwiss.silk.linkagerule.LinkageRule
+import de.fuberlin.wiwiss.silk.linkagerule.similarity.Comparison
 import de.fuberlin.wiwiss.silk.entity.Link
 import de.fuberlin.wiwiss.silk.util.DPair
+import collection.mutable.ListBuffer
 import util.Random
+import java.util.Map.Entry
+import de.fuberlin.wiwiss.silk.linkagerule.similarity.SimilarityOperator
+import scala.collection.mutable.HashMap
+import scala.collection.mutable.ArrayBuffer
+import java.io.File
+import de.fuberlin.wiwiss.silk.workspace.io.PropertyClusterImporter
+import de.fuberlin.wiwiss.silk.workspace.modules.linking.PropertyClusters
+import de.fuberlin.wiwiss.silk.workspace.User
+import de.fuberlin.wiwiss.silk.util.XMLUtils
 
 object ActiveLearningEvaluation extends EvaluationScript {
 
   override protected def run() {
-    val experiment = Experiment.default
+    val experiment = Experiment.representations
     val datasets = Dataset.fromWorkspace
 
     val values =
@@ -21,6 +33,7 @@ object ActiveLearningEvaluation extends EvaluationScript {
         for(config <- experiment.configurations) yield {
           execute(config, dataset)
         }
+        
       }
 
     val result =
@@ -45,18 +58,40 @@ object ActiveLearningEvaluation extends EvaluationScript {
 }
 
 class ActiveLearningEvaluator(config: LearningConfiguration,
-                              ds: Dataset) extends Task[RunResult] {
+                               ds: Dataset) extends Task[RunResult] {
 
   val numRuns = 1
 
-  val maxLinks = 1
+  val maxLinks =50
 
-  val maxPosRefLinks = 100
+  val maxPosRefLinks = 80
 
-  val maxNegRefLinks = 3000
-
-  protected override def execute() = {
+  val maxNegRefLinks = 800
+    
+  val schemaMatching = true
+  
+  
+  def createPropertyClusters(){
+    
+    //create property clusters file and objects
+    var clustersFile = new File ("C:/Users/User/.silk/workspace/"+ds.name+"/linking/"+ds.name+"/propertyClusters.xml")
+    var sourceFile = new File ("C:/Users/User/.silk/workspace/"+ds.name+"/resources/source")
+    var property_index = ds.task.cache.referenceEntitiesCache.value.negative.head._2.source.desc.paths
+    var loadedClusters = PropertyClusterImporter.loadInfoForXML(sourceFile, property_index)
+    PropertyClusterImporter.writeXML(loadedClusters, clustersFile)
+    ds.task.propertyClusters = Some(PropertyClusters.load(clustersFile)) 
+    
+  }
+  
+//  val numberOfSeedingPositiveLinks = 0
+//  val numberOfSeedingNegativeLinks = 0
+  
+ protected override def execute() = {
     //Execute the active learning runs
+    println("Cross Validation")
+    
+    if (schemaMatching) createPropertyClusters()
+
     val results = for(run <- 1 to numRuns) yield runActiveLearning(run)
 
     //Print aggregated results
@@ -73,22 +108,51 @@ class ActiveLearningEvaluator(config: LearningConfiguration,
   private def runActiveLearning(run: Int): Seq[LearningResult] = {
     logger.info("Experiment " + config.name + " on data set " + ds.name +  ": run " + run )
 
+    var propertyClusters = ds.task.propertyClusters
+    
     var referenceEntities = ReferenceEntities()
-    val validationEntities = ds.task.cache.entities
+    var entities = ds.task.cache.entities
+   
+    val posEntities = Random.shuffle(entities.positive.values)
+    val negEntities = Random.shuffle(entities.negative.values)
+    
+    //pool entities
+    val posPoolEntities = posEntities.take(maxPosRefLinks)
+    val negPoolEntities = negEntities.take(maxNegRefLinks)
+    val poolEntities = ReferenceEntities.fromEntities(posPoolEntities, negPoolEntities)
+    //seeding entities
+   // referenceEntities = ReferenceEntities.fromEntities(posPoolEntities.take(numberOfSeedingPositiveLinks) , negPoolEntities.take(numberOfSeedingNegativeLinks))
+    
+    
+    //validation entities
+    val posValEntities = posEntities.drop(maxPosRefLinks)
+    val negValEntities = negEntities.drop(maxNegRefLinks)
+    var valEntities = ReferenceEntities.fromEntities(posValEntities, negValEntities)
+    
 
-    val sourceEntities =  validationEntities.positive.values.map(_.source)
-    val targetEntities =  validationEntities.positive.values.map(_.target)
-    val positiveValLinks = for((link, entityPair) <- validationEntities.positive) yield link.update(entities = Some(entityPair))
-    val negativeValLinks = for(s <- sourceEntities; t <- targetEntities) yield new Link(s.uri, t.uri, None, Some(DPair(s, t)))
+    //construct the links of the pool
+    var positivePoolLinks = for((link, entityPair) <- poolEntities.positive) yield link.update(entities = Some(entityPair))
+    
+    var negativePoolLinks = for((link, entityPair) <- poolEntities.negative) yield link.update(entities = Some(entityPair))
 
-    var pool: Traversable[Link] = Nil//positiveValLinks.take(maxPosRefLinks) ++ Random.shuffle(negativeValLinks).take(maxNegRefLinks)
+    
+    var pool: Traversable[Link] = positivePoolLinks ++ negativePoolLinks
+    //part of the active learning task already
+    pool = pool.filterNot(referenceEntities.positive.contains).filterNot(referenceEntities.negative.contains)
+    
     var population = Population.empty
     val startTime = System.currentTimeMillis()
 
     //Holds the validation result from each iteration
     var learningResults = List[LearningResult]()
 
-    for(i <- 0 to maxLinks) {
+    
+    var matrix_entries =ListBuffer[(Link,LinkageRule, Option[Double])]()
+    //-numberOfSeedingPositiveLinks-numberOfSeedingNegativeLinks         
+    for(i <- 1 to maxLinks) yield {
+
+      //println("Size of reference entities:"+referenceEntities.negative.size+"---"+referenceEntities.positive.size)
+     
       val task =
         new ActiveLearningTask(
           config = config,
@@ -107,8 +171,12 @@ class ActiveLearningEvaluator(config: LearningConfiguration,
 
       //Evaluate performance of learned linkage rule
       val rule = population.bestIndividual.node.build
+      println(rule);
+      
       val trainScores = LinkageRuleEvaluator(rule, referenceEntities)
-      val valScores = LinkageRuleEvaluator(rule, validationEntities)
+      // eliminate the validation entities by the entities of the pool
+      
+      val valScores = LinkageRuleEvaluator(rule, valEntities)
       val learningResult =
         LearningResult(
           iterations = i,
@@ -119,25 +187,58 @@ class ActiveLearningEvaluator(config: LearningConfiguration,
           status = LearningResult.NotStarted
         )
 
-      println(i + " - " + trainScores)
-      println(i + " - " + valScores)
+//      println("False negatives in the training:"+ learningResult.trainingResult.falseNegativeEntities)
+//      println("False positives in the training:"+ learningResult.trainingResult.falsePositiveEntities)
+//
+//      println("Best Rule: "+rule.toString())
+
+      println(i + " - TRAIN - "+ referenceEntities.negative.size +"/"+ referenceEntities.positive.size+"-" + trainScores)
+      println(i + " - TEST -"+ valEntities.negative.size +"/"+ valEntities.positive.size+"-" + valScores)
       learningResults ::= learningResult
+      
+      if (schemaMatching && enoughConfidence(i)) {
+        //update schema information
+        propertyClusters.get.updateSchemaInfo(rule, learningResult.trainingResult)
+        //evaluate reclustering condition and recluster the member of which the condition is met
+        var reclusturedMembers = propertyClusters.get.evaluateReclusteringCondition()
+        //consider the changes in the clusters and update the schema information of the current entities (reference, validation, pool)
+        for (rc <- reclusturedMembers) {
+        
+            entities.negative.values.filter(_.source.uri.equals(rc._1.entity_uri)).foreach(p => p.source.update(rc._2.toInt, rc._1.property_values, rc._3.toInt))
+            entities.positive.values.filter(_.source.uri.equals(rc._1.entity_uri)).foreach(p => p.source.update(rc._2.toInt, rc._1.property_values, rc._3.toInt))
+         
+        }
+        
+      }
+
 //      if(valScores.fMeasure > 0.999) {
 //        return learningResults.reverse
 //      }
 
       //Evaluate new link
       val link = task.links.head
-      if(validationEntities.positive.contains(link)) {
-        println(link + " added to positive")
+      if(poolEntities.positive.contains(link)) {
+//        println(link + " added to positive")
         referenceEntities = referenceEntities.withPositive(link.entities.get)
       }
       else {
-        println(link + " added to negative")
+//        println(link + " added to negative")
         referenceEntities = referenceEntities.withNegative(link.entities.get)
       }
+      
+      
     }
 
-    learningResults.reverse
+   //TODO write new clusters file: spaghettii
+    if (schemaMatching)
+   PropertyClusterImporter.writeXML(propertyClusters.get.clusters, new File("C:/Users/User/.silk/workspace/"+ds.name+"/linking/"+ds.name+"/updatedClusters.xml"))
+   learningResults.reverse
+    
+  }
+  
+  def enoughConfidence(iterations:Integer):Boolean ={
+    //TODO change the confidence condition
+    if (iterations > 5) true
+    else false
   }
 }

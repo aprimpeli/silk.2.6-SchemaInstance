@@ -57,7 +57,7 @@ class ActiveLearningTask(config: LearningConfiguration,
 
 
     
-    updatePopulation(generator, targetFitness, completeEntities, fitnessFunction)
+     (generator, targetFitness, completeEntities, fitnessFunction)
 
     //Select evaluation links
     updateStatus("Selecting evaluation links", 0.8)

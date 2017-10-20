@@ -19,6 +19,7 @@ import de.fuberlin.wiwiss.silk.linkagerule.similarity.{Comparison, Aggregation, 
 import de.fuberlin.wiwiss.silk.evaluation.{LinkageRuleEvaluator, ReferenceEntities}
 import math.max
 
+//0.001
 case class MCCFitnessFunction(sizePenalty: Double = 0.001) extends FitnessFunction {
 
   def apply(referenceEntities: ReferenceEntities) = { (linkageRule: LinkageRule) =>

@@ -24,10 +24,10 @@ import de.fuberlin.wiwiss.silk.workspace.modules.Cache
  * Holds all caches.
  */
 class LinkingCaches() extends HasStatus {
-
+     
   /** The paths cache. */
   val pathCache = new PathsCache()
-
+  
   /** The reference entities cache. */
   val referenceEntitiesCache = new ReferenceEntitiesCache(pathCache)
 

@@ -28,6 +28,7 @@ case class JensenShannonDivergenceSelector(fulfilledOnly: Boolean = true) extend
    * Returns the links with the highest Jensen-Shannon divergence from any reference link.
    */
   override def apply(rules: Seq[WeightedLinkageRule], unlabeledLinks: Seq[Link], referenceEntities: ReferenceEntities): Seq[Link] = {
+    
     val posDist = referenceEntities.positive.values.map(referencePair => new ReferenceLinkDistance(referencePair, rules, true))
     val negDist = referenceEntities.negative.values.map(referencePair => new ReferenceLinkDistance(referencePair, rules, false))
     val dist = posDist ++ negDist

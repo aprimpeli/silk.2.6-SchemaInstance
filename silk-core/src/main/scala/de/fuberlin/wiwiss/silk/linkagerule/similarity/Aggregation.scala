@@ -69,6 +69,26 @@ case class Aggregation(id: Identifier = Operator.generateId,
 
     penalize(aggregator.evaluate(weightedValues), nilOps)
   }
+  
+  //no penalization - like in original silk
+//  override def apply(entities: DPair[Entity], limit: Double): Option[Double] = {
+//    val totalWeights = operators.foldLeft(0)(_ + _.weight)
+//
+//    var weightedValues: List[(Int, Option[Double])]= Nil
+//    //var for the sum of operators which returned None
+//    var nilOps = 0
+//    for(op <- operators) {
+//      val opThreshold = aggregator.computeThreshold(limit, op.weight.toDouble / totalWeights)
+//      op(entities, opThreshold) match {
+//        case Some(v) => weightedValues ::= (op.weight, Some(v))
+//        case None if op.required => return None
+//        case None => 
+//      }
+//    }
+//
+//    aggregator.evaluate(weightedValues)
+//  }
+
 
   /**
    * Indexes an entity.

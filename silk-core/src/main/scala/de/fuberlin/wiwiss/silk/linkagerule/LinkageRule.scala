@@ -18,18 +18,20 @@ import de.fuberlin.wiwiss.silk.util.{Uri, ValidatingXMLReader, DPair}
 import de.fuberlin.wiwiss.silk.config.Prefixes
 import evaluation.{DetailedEvaluator, DetailedIndexer}
 import math.abs
-import similarity.SimilarityOperator
+import similarity.{SimilarityOperator, Comparison, Aggregation}
 import xml.Node
 import de.fuberlin.wiwiss.silk.entity.{Index, Entity}
 import de.fuberlin.wiwiss.silk.util.XMLUtils._
 import de.fuberlin.wiwiss.silk.runtime.resource.ResourceLoader
+import scala.collection.mutable.ArrayBuffer
 
 /**
  * A linkage rule specifies the conditions which must hold true so that a link is generated between two entities.
  */
 case class LinkageRule(operator: Option[SimilarityOperator] = None,
                        filter: LinkFilter = LinkFilter(),
-                       linkType: Uri = Uri.fromURI("http://www.w3.org/2002/07/owl#sameAs")) {
+                       linkType: Uri = Uri.fromURI("http://www.w3.org/2002/07/owl#sameAs")
+                      ) {
   /**
    * Computes the similarity between two entities.
    *
@@ -47,6 +49,7 @@ case class LinkageRule(operator: Option[SimilarityOperator] = None,
     }
   }
 
+  
   /**
    * Indexes an entity.
    *
@@ -70,6 +73,24 @@ case class LinkageRule(operator: Option[SimilarityOperator] = None,
       {operator.toList.map(_.toXML)}
     </LinkageRule>
   }
+  
+  var comparison_operators = new ArrayBuffer[Comparison]()
+  
+  def getComparisonOperators(oper: SimilarityOperator = operator.get): Unit = {
+    
+     if (oper.isInstanceOf[Comparison])  {
+       comparison_operators += oper.asInstanceOf[Comparison]
+      }
+      else if (oper.isInstanceOf[Aggregation]) {
+        for (o <- oper.asInstanceOf[Aggregation].operators) {
+          getComparisonOperators(o)
+       }
+      }
+      else {println("This is strange")}
+        
+    }
+  
+  
 }
 
 /**

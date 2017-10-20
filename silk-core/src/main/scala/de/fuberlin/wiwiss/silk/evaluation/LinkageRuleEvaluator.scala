@@ -17,6 +17,9 @@
 package de.fuberlin.wiwiss.silk.evaluation
 
 import de.fuberlin.wiwiss.silk.linkagerule.LinkageRule
+import de.fuberlin.wiwiss.silk.util.DPair
+import de.fuberlin.wiwiss.silk.entity.Entity
+import scala.collection.mutable.HashSet
 
 object LinkageRuleEvaluator {
   def apply(rule: LinkageRule, entity: ReferenceEntities, threshold: Double = 0.0): EvaluationResult = {
@@ -29,17 +32,23 @@ object LinkageRuleEvaluator {
     var negativeScore = 0.0
     var positiveError = 0.0
     var negativeError = 0.0
+    
+    var falsePositives_entities:Set[DPair[Entity]] =  Set[DPair[Entity]]()
+    var falseNegative_entities:Set[DPair[Entity]] =  Set[DPair[Entity]]()
+    var truePositive_entities:Set[DPair[Entity]] =  Set[DPair[Entity]]()
 
     for (entityPair <- entity.positive.values) {
       val confidence = rule(entityPair, threshold)
-
+      
       if (confidence >= threshold) {
         truePositives += 1
         positiveScore += confidence
+        truePositive_entities += entityPair
       }
       else {
         falseNegatives += 1
         positiveError += -confidence
+        falseNegative_entities += entityPair
       }
     }
 
@@ -49,6 +58,7 @@ object LinkageRuleEvaluator {
       if (confidence >= threshold) {
         falsePositives += 1
         negativeError += confidence
+        falsePositives_entities += entityPair
       }
       else {
         trueNegatives += 1
@@ -83,6 +93,6 @@ object LinkageRuleEvaluator {
 //      (positiveScore / (positiveScore + positiveError)) * (negativeScore / (negativeScore + negativeError))
 //    }
 
-    new EvaluationResult(truePositives, trueNegatives, falsePositives, falseNegatives)
+    new EvaluationResult(truePositives, trueNegatives, falsePositives, falseNegatives, Some(falseNegative_entities), Some(falsePositives_entities), Some (truePositive_entities))
   }
 }

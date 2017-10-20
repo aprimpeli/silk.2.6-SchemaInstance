@@ -20,7 +20,7 @@ import java.io.{DataOutput, DataInput}
 /**
  * A single entity.
  */
-class Entity(val uri: String, val values: IndexedSeq[Set[String]], val desc: EntityDescription) {
+class Entity(val uri: String, var values: IndexedSeq[Set[String]], val desc: EntityDescription) {
   
   def evaluate(path: Path): Set[String] = {
     if(path.operators.isEmpty)
@@ -56,7 +56,30 @@ class Entity(val uri: String, val values: IndexedSeq[Set[String]], val desc: Ent
       }
     }
   }
+  
+  def update(oldIndex: Int, valuesReassign: Set[String], newIndex: Int) = {
+    
+    var filtered = Set[String] ()
+     
+    for (v <- valuesReassign) if (values(oldIndex).contains(v)) filtered += v
+    
+    
+    var newvalues= for (i<- 0 to values.size-1) yield {
+      if(i == oldIndex){
+         values(i).--(filtered)
+      }
+      else if (i == newIndex){
+        values(i).++(filtered)
+      }
+      else values(i)
+    }
+        
+    values = newvalues
+    
+  }
 }
+
+  
 
 object Entity {
   def fromXML(node: Node, desc: EntityDescription) = {
@@ -81,4 +104,6 @@ object Entity {
 
     new Entity(uri, values, desc)
   }
+  
+  
 }

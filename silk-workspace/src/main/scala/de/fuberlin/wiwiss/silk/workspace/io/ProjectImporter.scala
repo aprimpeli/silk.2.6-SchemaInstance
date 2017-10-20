@@ -54,6 +54,8 @@ object ProjectImporter
     val cache = new LinkingCaches()
     cache.loadFromXML(xml \ "Cache" \ "_" head)
 
+    
+
     LinkingTask(project, linkSpec, referenceLinks, cache)
   }
 }

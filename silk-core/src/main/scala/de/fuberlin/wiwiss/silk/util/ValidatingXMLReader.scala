@@ -37,7 +37,6 @@ class ValidatingXMLReader[T](deserializer: Node => T, schemaPath: String) {
 
   def apply(stream: InputStream): T = {
     val node = new XmlReader().read(new InputSource(stream), schemaPath)
-
     deserializer(node)
   }
 
@@ -107,7 +106,8 @@ class ValidatingXMLReader[T](deserializer: Node => T, schemaPath: String) {
       //Return result
       if (validationErrors.isEmpty) {
         val xml = rootElem.asInstanceOf[Elem]
-        checkUniqueIdentifiers(xml)
+        if (schemaPath.toLowerCase().contains("linkspecification"))
+          checkUniqueIdentifiers(xml)
         xml
       }
       else {

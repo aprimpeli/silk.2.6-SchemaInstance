@@ -17,6 +17,7 @@ package de.fuberlin.wiwiss.silk.learning.active
 import de.fuberlin.wiwiss.silk.entity.Link
 import de.fuberlin.wiwiss.silk.evaluation.ReferenceEntities
 import de.fuberlin.wiwiss.silk.learning.individual.Population
+import de.fuberlin.wiwiss.silk.linkagerule.LinkageRule
 
 /**
  * Completes a set of reference links i.e. makes sure that it contains at least one positive and one negative link.

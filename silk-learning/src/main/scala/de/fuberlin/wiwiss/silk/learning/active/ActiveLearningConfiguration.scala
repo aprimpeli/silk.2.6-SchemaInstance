@@ -14,7 +14,7 @@
 
 package de.fuberlin.wiwiss.silk.learning.active
 
-import linkselector.{EntropySelector, JensenShannonDivergenceSelector, LinkSelector}
+import linkselector.{EntropySelector, JensenShannonDivergenceSelector, LinkSelector, KullbackLeiblerDivergenceSelector}
 
 
 case class ActiveLearningConfiguration(selector: LinkSelector = JensenShannonDivergenceSelector())

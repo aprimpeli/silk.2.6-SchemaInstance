@@ -20,6 +20,7 @@ import de.fuberlin.wiwiss.silk.linkagerule.Operator
 import xml.Node
 import de.fuberlin.wiwiss.silk.util.{ValidationException, Identifier, DPair}
 import de.fuberlin.wiwiss.silk.runtime.resource.ResourceLoader
+import de.fuberlin.wiwiss.silk.entity.PathOperator
 
 /**
  * A TransformInput applies a transform to input values.
@@ -27,6 +28,15 @@ import de.fuberlin.wiwiss.silk.runtime.resource.ResourceLoader
 case class TransformInput(id: Identifier = Operator.generateId, transformer: Transformer, inputs: Seq[Input]) extends Input {
   require(inputs.size > 0, "Number of inputs must be > 0.")
 
+  override def getPropertyPaths () : Set[PathOperator] =  {   
+    
+    var properties= Set[PathOperator]()
+    for (i <- inputs) {
+       properties = properties ++  i.getPropertyPaths()
+    }
+    properties
+  }
+  
   def apply(entities: DPair[Entity]): Set[String] = {
     val values = for (input <- inputs) yield input(entities)
 

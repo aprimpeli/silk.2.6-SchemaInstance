@@ -24,6 +24,7 @@ import de.fuberlin.wiwiss.silk.config.Prefixes
 import xml.Node
 import de.fuberlin.wiwiss.silk.linkagerule.input.Input
 import de.fuberlin.wiwiss.silk.testutil.approximatelyEqualTo
+import de.fuberlin.wiwiss.silk.entity.PathOperator
 
 @RunWith(classOf[JUnitRunner])
 class ComparisonTest extends FlatSpec with ShouldMatchers {
@@ -49,5 +50,12 @@ class ComparisonTest extends FlatSpec with ShouldMatchers {
     val id = Identifier.random
     def apply(entities: DPair[Entity]) = Set("dummy")
     def toXML(implicit prefixes: Prefixes): Node = null
+    
+    override def getPropertyPaths () : Set[PathOperator] =  {   
+    
+    var properties= Set[PathOperator]()
+    
+    properties
+  }
   }
 }

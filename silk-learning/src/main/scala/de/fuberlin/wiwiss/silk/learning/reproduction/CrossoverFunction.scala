@@ -19,6 +19,7 @@ import de.fuberlin.wiwiss.silk.util.DPair
 import util.Random
 import de.fuberlin.wiwiss.silk.learning.individual.{Individual, LinkageRuleNode}
 import de.fuberlin.wiwiss.silk.linkagerule.LinkageRule
+import collection.mutable.HashMap
 
 /**
  * Combines two linkage rules into a new one.
@@ -27,25 +28,30 @@ class CrossoverFunction(fitnessFunction: (LinkageRule => Double), components: Co
   /**
    * The operators which will be employed for crossover.
    */
+  
   val operators = {
     if(components.useSpecializedCrossover) {
       var ops = List[CrossoverOperator]()
 
       //We always learn thresholds and weights
       ops ::= ThresholdCrossover()
+
       ops ::= WeightCrossover()
+
       ops ::= RequiredCrossover()
       //We always modify existing aggregations
       ops ::= AggregationOperatorsCrossover()
+      
       ops ::= AggregationFunctionCrossover()
       //We always learn distance functions
       ops ::= DistanceMeasureCrossover()
-
+      
       if(components.transformations)
         ops ::= TransformationCrossover()
 
-      if(components.hierarchies)
+      if(components.hierarchies) {
         ops ::= OperatorCrossover()
+      }
 
       ops
     }
@@ -58,9 +64,10 @@ class CrossoverFunction(fitnessFunction: (LinkageRule => Double), components: Co
    * Combines two linkage rules into a new one.
    */
   def apply(ind1: Individual, ind2: Individual): Individual = {
+      
     //Choose a random crossover operator
     val operator = operators(Random.nextInt(operators.size))
-
+    
     //Apply operator
     val combined =
       operator(DPair(ind1.node, ind2.node)) match {
@@ -73,6 +80,9 @@ class CrossoverFunction(fitnessFunction: (LinkageRule => Double), components: Co
       }
     }
 
-    Individual(combined, fitnessFunction(combined.build))
+    val offspring = Individual(combined, fitnessFunction(combined.build))
+    //println(operator.toString()+";"+(ind1.fitness+ind2.fitness)/2+";"+offspring.fitness)
+    offspring
+ //   Individual(combined, fitnessFunction(combined.build))
   }
 }

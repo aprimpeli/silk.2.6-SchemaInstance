@@ -18,29 +18,39 @@ import de.fuberlin.wiwiss.silk.config.LinkSpecification
 import de.fuberlin.wiwiss.silk.workspace.modules.ModuleTask
 import de.fuberlin.wiwiss.silk.evaluation.ReferenceLinks
 import de.fuberlin.wiwiss.silk.workspace.Project
+import de.fuberlin.wiwiss.silk.util.Identifier
 
 /**
  * A linking task, which interlinks two data sets.
  */
-class LinkingTask private(val linkSpec: LinkSpecification, val referenceLinks: ReferenceLinks, val cache: LinkingCaches) extends ModuleTask {
+class LinkingTask private(val linkSpec: LinkSpecification, val referenceLinks: ReferenceLinks, val cache: LinkingCaches, var propertyClusters: Option[PropertyClusters] = None) extends ModuleTask {
   val name = linkSpec.id
 
   def updateLinkSpec(linkSpec: LinkSpecification, project: Project) = {
-    LinkingTask(project, linkSpec, referenceLinks, cache)
+    LinkingTask(project, linkSpec, referenceLinks, cache, propertyClusters)
   }
 
   def updateReferenceLinks(referenceLinks: ReferenceLinks, project: Project) = {
-    LinkingTask(project, linkSpec, referenceLinks, cache)
+    LinkingTask(project, linkSpec, referenceLinks, cache, propertyClusters)
   }
+  
 }
 
 object LinkingTask {
   /**
    * Constructs a new linking task and starts loading the cache.
    */
-  def apply(project: Project, linkSpec: LinkSpecification, referenceLinks: ReferenceLinks = ReferenceLinks(), cache: LinkingCaches = new LinkingCaches()) = {
+  def apply(project: Project, linkSpec: LinkSpecification, referenceLinks: ReferenceLinks = ReferenceLinks(), 
+      cache: LinkingCaches = new LinkingCaches(), propertyClusters: Option[PropertyClusters] = None ) = {
     val task = new LinkingTask(linkSpec, referenceLinks, cache)
+    
+    println("Load cache.")
     task.cache.load(project, task)
+
     task
   }
+  
+  
+  
+  
 }

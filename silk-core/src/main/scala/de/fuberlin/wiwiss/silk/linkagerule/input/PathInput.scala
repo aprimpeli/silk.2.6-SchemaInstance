@@ -14,7 +14,7 @@
 
 package de.fuberlin.wiwiss.silk.linkagerule.input
 
-import de.fuberlin.wiwiss.silk.entity.{Entity, Path}
+import de.fuberlin.wiwiss.silk.entity.{Entity, Path, PathOperator}
 import de.fuberlin.wiwiss.silk.config.Prefixes
 import de.fuberlin.wiwiss.silk.linkagerule.Operator
 import xml.Node
@@ -52,8 +52,13 @@ case class PathInput(id: Identifier = Operator.generateId, path: Path) extends I
       }
       entity.evaluate(index)
     }
+     
   }
 
+   override def getPropertyPaths : Set[PathOperator] = {
+      path.operators.toSet
+   }
+   
   override def toXML(implicit prefixes: Prefixes) = <Input id={id} path={path.serialize}/>
 }
 

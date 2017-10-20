@@ -21,6 +21,8 @@ case class Population(individuals : Traversable[Individual]) {
 
   /** The individual with the best score */
   lazy val bestIndividual = individuals.maxBy(_.fitness)
+  
+  lazy val top10 = individuals.toList.sortBy(_.fitness).take(10)
 
   /** True, if the population is empty */
   def isEmpty = individuals.isEmpty

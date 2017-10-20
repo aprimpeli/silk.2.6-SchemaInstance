@@ -6,7 +6,6 @@ import de.fuberlin.wiwiss.silk.entity.EntityDescription
 import de.fuberlin.wiwiss.silk.workspace.Project
 import xml.{Node, NodeSeq, NodeBuffer}
 import de.fuberlin.wiwiss.silk.workspace.modules.Cache
-
 /**
  * Holds the most frequent paths.
  */

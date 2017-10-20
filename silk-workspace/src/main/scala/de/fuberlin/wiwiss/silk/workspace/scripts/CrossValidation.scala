@@ -33,7 +33,7 @@ object CrossValidation extends EvaluationScript {
   }
 
   protected def runExperiment() {
-    val experiment = Experiment.phones
+    val experiment = Experiment.default
     val datasets = Dataset.fromWorkspace
     
     val values =
@@ -60,6 +60,8 @@ object CrossValidation extends EvaluationScript {
     log.info("Running: " + dataset.name)
     val cache = dataset.task.cache
     cache.waitUntilLoaded()
+    println("RULES:"+Seq(dataset.task.linkSpec.rule).toString())
+    println("LOADED:"+cache.entities.positive.size+"--"+cache.entities.negative.size)
     val task = new CrossValidation(cache.entities, config, Seq(dataset.task.linkSpec.rule))
     task()
   }
@@ -72,10 +74,10 @@ class CrossValidation(entities : ReferenceEntities, config: LearningConfiguratio
   require(entities.isDefined, "Reference Entities are required")
   
   /** The number of cross validation runs. */
-  private val numRuns = 1
+  private val numRuns = 5
 
   /** The number of splits used for cross-validation. */
-  private val numFolds = 2
+  private val numFolds = 4
 
   /** Don't log progress. */
   progressLogLevel = Level.FINE
@@ -105,7 +107,7 @@ class CrossValidation(entities : ReferenceEntities, config: LearningConfiguratio
   private def crossValidation(run: Int): Seq[Seq[LearningResult]] = {
     logger.info("Cross validation run " + run)
     
-    val splits = split7030ReferenceEntities()
+    val splits = splitReferenceEntities()
 
 
     for((split, index) <- splits.zipWithIndex) yield {
@@ -115,6 +117,7 @@ class CrossValidation(entities : ReferenceEntities, config: LearningConfiguratio
 
       var results = List[LearningResult]()
       val addResult = (result: LearningResult) => {
+        println("Iteration:"+result.iterations)
         if (result.iterations > results.view.map(_.iterations).headOption.getOrElse(0))
           results ::= result
       }

@@ -14,7 +14,7 @@
 
 package de.fuberlin.wiwiss.silk.workspace
 
-import modules.linking.{LinkingCaches, LinkingTask, LinkingConfig, LinkingModule}
+import modules.linking.{LinkingCaches, LinkingTask, LinkingConfig, LinkingModule, PropertyClusters, PropertyClusterMember}
 import modules.output.{OutputTask, OutputConfig, OutputModule}
 import de.fuberlin.wiwiss.silk.workspace.modules.source.{TypesCache, SourceConfig, SourceTask, SourceModule}
 import xml.XML
@@ -30,6 +30,7 @@ import de.fuberlin.wiwiss.silk.output.Output
 import de.fuberlin.wiwiss.silk.runtime.resource.FileResourceManager
 import de.fuberlin.wiwiss.silk.workspace.modules.transform.{PathsCache, TransformConfig, TransformTask, TransformModule}
 import de.fuberlin.wiwiss.silk.linkagerule.TransformRule
+import de.fuberlin.wiwiss.silk.workspace.io.PropertyClusterImporter
 
 /**
  * Implementation of a project which is stored on the local file system.
@@ -139,7 +140,9 @@ class FileProject(file : File) extends Project {
         cachedTasks = {
           val files = file.list.toList
           val sourceFiles = files.filter(_.endsWith(".xml")).filter(!_.contains("cache"))
-          for(fileName <- sourceFiles) yield loadSource(fileName)
+          for(fileName <- sourceFiles) yield {
+            loadSource(fileName)
+          }
         }.map(task => (task.name, task)).toMap
       }
     }
@@ -204,27 +207,27 @@ class FileProject(file : File) extends Project {
 
     private def load() : Map[Identifier, LinkingTask] = {
       file.mkdir()
-
       val tasks =
         for(fileName <- file.list.toList) yield
         {
           val projectConfig = FileProject.this.config
           val linkSpec = LinkSpecification.load(resourceManager)(projectConfig.prefixes)(file + ("/" + fileName + "/linkSpec.xml"))
-          val referenceLinks = ReferenceLinksReader.readReferenceLinks(file + ("/" + fileName + "/alignment.xml"))
+          val referenceLinks = ReferenceLinksReader.readReferenceLinks(file + ("/" + fileName + "/alignment.xml")) 
+          
           val cache = new LinkingCaches()
-
           //Load the cache
           try {
+            logger.log(Level.INFO, "Load the cache from XML found in :"+file + ("/" + fileName + "/cache.xml"))
             cache.loadFromXML(XML.loadFile(file + ("/" + fileName + "/cache.xml")))
           } catch {
             case ex : Exception =>
               logger.log(Level.WARNING, "Cache corrupted. Rebuilding Cache.", ex)
               new LinkingCaches()
           }
-
+          
           LinkingTask(FileProject.this, linkSpec, referenceLinks, cache)
         }
-
+      
       tasks.map(task => (task.name, task)).toMap
     }
 

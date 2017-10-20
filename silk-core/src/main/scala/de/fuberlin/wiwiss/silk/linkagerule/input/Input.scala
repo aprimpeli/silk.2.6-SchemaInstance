@@ -14,7 +14,7 @@
 
 package de.fuberlin.wiwiss.silk.linkagerule.input
 
-import de.fuberlin.wiwiss.silk.entity.Entity
+import de.fuberlin.wiwiss.silk.entity.{Entity,PathOperator}
 import de.fuberlin.wiwiss.silk.util.DPair
 import de.fuberlin.wiwiss.silk.config.Prefixes
 import xml.Node
@@ -34,6 +34,8 @@ trait Input extends Operator {
   def apply(entities: DPair[Entity]): Set[String]
 
   def toXML(implicit prefixes: Prefixes): Node
+  
+  def getPropertyPaths() : Set[PathOperator]
 }
 
 object Input {

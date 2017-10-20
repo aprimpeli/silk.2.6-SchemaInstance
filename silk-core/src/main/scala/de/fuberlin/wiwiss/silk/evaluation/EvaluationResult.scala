@@ -17,13 +17,18 @@
 package de.fuberlin.wiwiss.silk.evaluation
 
 import scala.math.sqrt
+import de.fuberlin.wiwiss.silk.util.DPair
+import de.fuberlin.wiwiss.silk.entity.Entity
 
 /**
  * Holds the evaluation result of a linkage rule.
  * Provides various information retrieval metrics.
  */
 class EvaluationResult(val truePositives: Int, val trueNegatives: Int,
-                       val falsePositives: Int, val falseNegatives: Int) {
+                       val falsePositives: Int, val falseNegatives: Int,
+                       var falseNegativeEntities: Option[(Set[DPair[Entity]])] = Some (Set[DPair[Entity]]()),
+                       var falsePositiveEntities: Option[(Set[DPair[Entity]])] = Some (Set[DPair[Entity]]()),
+                       var truePositiveEntities: Option[(Set[DPair[Entity]])] = Some (Set[DPair[Entity]]())){
 
   def score: Double = mcc
 

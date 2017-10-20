@@ -28,7 +28,7 @@ import scala.xml.Node
 class Link(source: String,
            target: String,
            val confidence: Option[Double] = None,
-           val entities: Option[DPair[Entity]] = None) extends DPair[String](source, target) {
+           var entities: Option[DPair[Entity]] = None) extends DPair[String](source, target) {
 
   def this(link: Link) = this(link.source, link.target, link.confidence, link.entities)
 

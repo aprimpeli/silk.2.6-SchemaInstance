@@ -26,7 +26,6 @@ class ReferenceEntitiesCache(pathsCache: PathsCache) extends Cache[LinkingTask, 
 //      update = true
       //TODO reset reference entities = ReferenceEntities.empty
 //    }
-
     val entityLoader = new EntityLoader(project, task, pathsCache.value)
     entityLoader.load()
   }
