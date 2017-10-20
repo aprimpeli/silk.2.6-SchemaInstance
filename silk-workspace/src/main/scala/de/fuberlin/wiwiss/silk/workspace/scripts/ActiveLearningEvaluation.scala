@@ -18,7 +18,7 @@ import scala.collection.mutable.HashMap
 import scala.collection.mutable.ArrayBuffer
 import java.io.File
 import de.fuberlin.wiwiss.silk.workspace.io.PropertyClusterImporter
-import de.fuberlin.wiwiss.silk.workspace.modules.linking.PropertyClusters
+import de.fuberlin.wiwiss.silk.workspace.modules.linking.{PropertyClusters, SchemaAnalyzer}
 import de.fuberlin.wiwiss.silk.workspace.User
 import de.fuberlin.wiwiss.silk.util.XMLUtils
 
@@ -112,6 +112,10 @@ class ActiveLearningEvaluator(config: LearningConfiguration,
     
     var referenceEntities = ReferenceEntities()
     var entities = ds.task.cache.entities
+    var entity_source_desc = entities.negative.head._2.source.desc
+    var entity_target_desc = entities.negative.head._2.target.desc
+    //initialize the schema analyzer
+    var schemaAnalyzer = SchemaAnalyzer(entity_source_desc, entity_target_desc)
    
     val posEntities = Random.shuffle(entities.positive.values)
     val negEntities = Random.shuffle(entities.negative.values)
@@ -198,7 +202,7 @@ class ActiveLearningEvaluator(config: LearningConfiguration,
       
       if (schemaMatching && enoughConfidence(i)) {
         //update schema information
-        propertyClusters.get.updateSchemaInfo(rule, learningResult.trainingResult)
+        propertyClusters.get.updateSchemaInfo(rule, learningResult.trainingResult, schemaAnalyzer)
         //evaluate reclustering condition and recluster the member of which the condition is met
         var reclusturedMembers = propertyClusters.get.evaluateReclusteringCondition()
         //consider the changes in the clusters and update the schema information of the current entities (reference, validation, pool)

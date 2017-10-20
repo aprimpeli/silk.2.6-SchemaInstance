@@ -32,6 +32,7 @@ import de.fuberlin.wiwiss.silk.linkagerule.input.Input
 import de.fuberlin.wiwiss.silk.linkagerule.input.TransformInput
 import de.fuberlin.wiwiss.silk.evaluation.EvaluationResult
 import scala.util.Random
+import de.uni_mannheim.informatik.dws.winter.similarity.string.JaccardOnNGramsSimilarity
 
 
 
@@ -95,91 +96,33 @@ case class PropertyClusters(var clusters: Traversable[PropertyCluster] ){
    }
    
 
-   def updateSchemaInfo (rule: LinkageRule, training_result: EvaluationResult )  = {
+
+   def updateSchemaInfo(rule: LinkageRule, training_result: EvaluationResult, schemaAnalyzer: SchemaAnalyzer ) {
      
      rule.getComparisonOperators()
      
-     //we believe that falsePositives cannot give any information on schema reclustering
-      for (e <- training_result.falseNegativeEntities.get ++ training_result.truePositiveEntities.get) {
-       var source_entity = e.source.uri
-       
-       var possibly_wrong_properties = Set[PathOperator]()
-       var source_properties = e.source.desc.paths.flatMap(_.operators)
-        
-       //exploit the information from the properties belonging to the linkage rule
-       var comparatorsInformation = getComparatorsInfo(e, rule, training_result)
-       possibly_wrong_properties = comparatorsInformation._1
-       var checked_properties = comparatorsInformation._2
-             
-       //now exploit the rest of the properties for the entities that are annotated as positive matches
-       println("Size of paths:"+e.source.desc.paths.size)
-//       for  (p <- e.source.desc.paths){
-//         println("Current path:"+p.toString())
-//         //TODO
-//         if (!checked_properties.contains(p.operators.head)){
-//           var propertyIndex = p.hashCode();
-//           var sourceValues = e.source.values.indexOf(propertyIndex)
-//           var targetValues = e.target.values.indexOf(propertyIndex)
-//           //compare the source and the target values based on their datatype
-//           println("compare source values"+sourceValues)
-//           println("with target values"+targetValues)
-//           
-//         }        
-//       }
-       //we should not only consider the properties of the operators BUT all the properties
-       for (wp <- possibly_wrong_properties) {
+     for (e <- training_result.falseNegativeEntities.get ++ training_result.truePositiveEntities.get) {
+          var possibly_wrong_properties = schemaAnalyzer.analyzeSchemaOfEntityPair(rule, training_result, e)
+          
+          //we believe that falsePositives cannot give any information on schema reclustering
+          for (wp <- possibly_wrong_properties) {
                 
-         //normalize the property name as it is in the form of path
-         val PropertyRegex = """.*<([^>]*)>""".r
-         var PropertyRegex(property_name) = wp.toString()
-         
-         var candidate_cluster_members = locateMember(source_entity, property_name)
-         
-         for (c <- candidate_cluster_members) {
-           if (!c.cluster_id.equals("")) {
-              c.schema_errors.doubts += 1
-            
+             //normalize the property name as it is in the form of path
+             val PropertyRegex = """.*<([^>]*)>""".r
+             var PropertyRegex(property_name) = wp.toString()
+             
+             var candidate_cluster_members = locateMember(e.source.uri, property_name)
+             
+             for (c <- candidate_cluster_members) {
+               if (!c.cluster_id.equals("")) {
+                  c.schema_errors.doubts += 1
+                
+               }
+             }
+             
            }
-         }
-         
        }
      }
-
-   }
-   
-   def getComparatorsInfo (e:DPair[Entity] , rule: LinkageRule, training_result: EvaluationResult) : (Set[PathOperator],Set[PathOperator])= {
-     
-     var possibly_wrong_properties = Set[PathOperator]()
-     var checked_properties = Set[PathOperator]()
-     
-     for (operator <- rule.comparison_operators) {
-         //TODO check if this the real threshold
-         var result = operator.apply(e, operator.threshold)
-         var property = operator.inputs.source
-         checked_properties = checked_properties ++ (property.getPropertyPaths()) //keep track of the properties that are not part of the linkage rule
-         //if the result for this specific operator is different than it should be
-         //heuristic consider the false negatives for schema reclustering if the rule is good (training result is high)
-         if (training_result.fMeasure>0.5){
-           if (result.isDefined && ((result.get>0.0 && training_result.falsePositiveEntities.get.contains(e)) 
-             || (result.get<0.0 && training_result.falseNegativeEntities.get.contains(e)))) {       
-            possibly_wrong_properties = possibly_wrong_properties ++ (property.getPropertyPaths())    
-         }
-         }
-         
-         
-         //raise a doubt if there are true positives but the source cluster id and the target property do not match
-         //heuristic consider the true positives for schema reclustering if the rule is bad (training result is low)
-         if (training_result.fMeasure<0.5){
-           if (result.isDefined && ((result.get>0.0 && training_result.truePositiveEntities.get.contains(e))) ){     
-             if (operator.inputs.source.getPropertyPaths().size>1 || operator.inputs.target.getPropertyPaths().size>1)
-               println("This should not happen. CHECK!")
-             if (!operator.inputs.source.getPropertyPaths().head.equals(operator.inputs.target.getPropertyPaths().head))
-               possibly_wrong_properties = possibly_wrong_properties ++ (property.getPropertyPaths())
-           }
-         }  
-       }
-     (possibly_wrong_properties, checked_properties)
-   }
    
    def evaluateReclusteringCondition () : Set [(PropertyClusterMember, String, String)] = {
      
