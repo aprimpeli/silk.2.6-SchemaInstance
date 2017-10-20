@@ -62,7 +62,7 @@ class ActiveLearningEvaluator(config: LearningConfiguration,
 
   val numRuns = 1
 
-  val maxLinks =50
+  val maxLinks =40
 
   val maxPosRefLinks = 80
 
@@ -215,7 +215,7 @@ class ActiveLearningEvaluator(config: LearningConfiguration,
 //        return learningResults.reverse
 //      }
 
-      //Evaluate new link
+      //Evaluate new lin
       val link = task.links.head
       if(poolEntities.positive.contains(link)) {
 //        println(link + " added to positive")
