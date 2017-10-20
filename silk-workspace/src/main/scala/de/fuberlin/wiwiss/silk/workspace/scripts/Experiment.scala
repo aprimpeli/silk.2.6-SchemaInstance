@@ -18,8 +18,9 @@ import de.fuberlin.wiwiss.silk.learning.LearningConfiguration.{Parameters, Compo
 import de.fuberlin.wiwiss.silk.learning.individual.fitness.{FMeasureFitness, MCCFitnessFunction}
 import de.fuberlin.wiwiss.silk.learning.active.ActiveLearningConfiguration
 import de.fuberlin.wiwiss.silk.learning.LearningConfiguration
-import de.fuberlin.wiwiss.silk.learning.active.linkselector.{JensenShannonDivergenceSelector, EntropySelector, RandomSelector}
+import de.fuberlin.wiwiss.silk.learning.active.linkselector.{JensenShannonDivergenceSelector, EntropySelector, RandomSelector, KullbackLeiblerDivergenceSelector}
 import de.fuberlin.wiwiss.silk.workspace.scripts.PerformanceMetric.{MaxFMeasure, Size, FixedIterationsFMeasure}
+import de.fuberlin.wiwiss.silk.learning.reproduction.ReproductionConfiguration
 
 /**
  * An experiment consisting of a number of configurations which should be compared and a number of performance metrics.
@@ -44,13 +45,8 @@ object Experiment {
    */
   val representations =
     Experiment("representations",
-      configurations =
-        LearningConfiguration("Boolean",   components = Components(linear = false, boolean = true,  hierarchies = true,  transformations = false), params = Parameters(maxIterations = 25)) ::
-        LearningConfiguration("Linear",    components = Components(linear = true,  boolean = false, hierarchies = false, transformations = false), params = Parameters(maxIterations = 25)) ::
-        LearningConfiguration("Nonlinear", components = Components(linear = true,  boolean = true,  hierarchies = true,  transformations = false), params = Parameters(maxIterations = 25)) ::
-        LearningConfiguration("Full",      components = Components(linear = true,  boolean = true,  hierarchies = true,  transformations = true),  params = Parameters(maxIterations = 25)) :: Nil,
-      metrics =
-          FixedIterationsFMeasure(0) :: FixedIterationsFMeasure(10) :: FixedIterationsFMeasure(25) :: Nil
+        LearningConfiguration("Full",      components = Components(linear = true,  boolean = true,  hierarchies = true,  transformations = true)) :: Nil,
+         metrics = Nil
     )
 
   /**
@@ -102,6 +98,11 @@ object Experiment {
         FixedIterationsFMeasure(0) :: FixedIterationsFMeasure(10) :: Size(0) :: Size(10) :: Nil
     )
 
+    //try out runs with different mutation probabilities
+    val mutation = Experiment ("Mutation prob",
+                              configurations = LearningConfiguration("Our Approach", reproduction = ReproductionConfiguration(mutationProbability = 0.5)):: Nil,
+                              metrics = Nil
+                              )
   /**
    * Compares different query strategies.
    */
@@ -113,13 +114,10 @@ object Experiment {
       metrics = MaxFMeasure(10) :: Nil
     )
 
-
-  /**
-    * Product data.
-    */
-  val phones =
-    Experiment("Phones",
-      configurations = LearningConfiguration("Phones") :: Nil,
+  val queryyEntropy =
+    Experiment("Query Strategy",
+      configurations = LearningConfiguration("Our Approach", active = ActiveLearningConfiguration(selector = EntropySelector())):: Nil,
       metrics = Nil
     )
+  
 }
