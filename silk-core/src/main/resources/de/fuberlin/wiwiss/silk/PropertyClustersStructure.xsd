@@ -10,7 +10,9 @@
               <xs:element name="table_column" maxOccurs="unbounded" minOccurs="0">
                 <xs:complexType>
                   <xs:sequence>
+                  	<xs:element type="xs:integer" name="table_column_id"/>
                     <xs:element type="xs:anyURI" name="table_id"/>
+                    <xs:element type="xs:string" name="correct_predicate"/>                   
                     <xs:element name="members">
                       <xs:complexType>
                         <xs:sequence>

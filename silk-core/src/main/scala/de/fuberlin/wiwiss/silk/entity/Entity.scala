@@ -20,7 +20,8 @@ import java.io.{DataOutput, DataInput}
 /**
  * A single entity.
  */
-class Entity(val uri: String, var values: IndexedSeq[Set[String]], val desc: EntityDescription) {
+class Entity(val uri: String, var values: IndexedSeq[(Set[String])] ,   val desc: EntityDescription, var valuesOfColumns:Option[IndexedSeq[(Set[(String, Integer)])]]=  Some(IndexedSeq[(Set[(String, Integer)])]()) ){
+  
   
   def evaluate(path: Path): Set[String] = {
     if(path.operators.isEmpty)

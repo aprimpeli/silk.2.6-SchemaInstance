@@ -32,19 +32,19 @@ object ClusterFileCreator {
     
   } 
   
-  private val NTriplesRegex = """<([^>]*)>\s*<([^>]*)>\s*[<"]?([^>]*)[>"].*""".r
+  private val NTriplesRegex = """<([^>]*)>\s*<([^>]*)>\s*[<"]?([^>]*)[>"].\s*<([^>]*)>*""".r
  
   //read source file
   def readNTriples(source: Source) : Set[PropertyClusterMember] = {    
     var members = Set[PropertyClusterMember]()
   
     for (line <- source.getLines)  {
-      var NTriplesRegex(subject_, predicate_, object_) = line
+      var NTriplesRegex(subject_, predicate_, object_, correct_predicate_) = line
 
       var existing = members.filter(p => p.entity_uri.equals(subject_) && p.property_name.equals(predicate_))
       var member = PropertyClusterMember()
       if (existing.size==0) {
-        member = new PropertyClusterMember("", subject_, predicate_, "default_id", Set[String](), SchemaErrors())
+        member = new PropertyClusterMember("", subject_, predicate_, correct_predicate_, "default_id",0, Set[String](), SchemaErrors())
       }
       else {
         member = existing.head

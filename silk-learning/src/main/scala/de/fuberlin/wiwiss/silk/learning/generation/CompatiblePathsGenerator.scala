@@ -141,7 +141,8 @@ class CompatiblePathsGenerator(components: Components) {
         new Entity(
           uri = transformValues(Set(entity.uri)).head,
           values = for(values <- entity.values) yield transformValues(values),
-          desc = entity.desc
+          desc = entity.desc,
+          valuesOfColumns = entity.valuesOfColumns
         )
       }
     }

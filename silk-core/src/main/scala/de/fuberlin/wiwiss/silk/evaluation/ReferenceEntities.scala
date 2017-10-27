@@ -51,9 +51,7 @@ case class ReferenceEntities(var positive: Map[Link, DPair[Entity]] = Map.empty,
   def withNegative(entityPair: DPair[Entity]) = {
     copy(negative = negative + (new Link(entityPair.source.uri, entityPair.target.uri) -> entityPair))
   }
-  
-  
-  
+    
 }
 
 object ReferenceEntities {

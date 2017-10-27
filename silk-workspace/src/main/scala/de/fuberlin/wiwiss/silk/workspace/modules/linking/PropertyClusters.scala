@@ -33,6 +33,8 @@ import de.fuberlin.wiwiss.silk.linkagerule.input.TransformInput
 import de.fuberlin.wiwiss.silk.evaluation.EvaluationResult
 import scala.util.Random
 import de.uni_mannheim.informatik.dws.winter.similarity.string.JaccardOnNGramsSimilarity
+import de.fuberlin.wiwiss.silk.plugins.distance.tokenbased.SoftJaccardDistance
+import de.fuberlin.wiwiss.silk.evaluation.ReferenceEntities
 
 
 
@@ -50,7 +52,7 @@ case class PropertyClusters(var clusters: Traversable[PropertyCluster] ){
     var example =  for (c <- clusters) yield {
       for (t <- c.tableColumns) yield {
         for (m <- t.members) yield {
-         if (m.entity_uri==entity_uri && m.property_name==property_name) {
+         if (m.entity_uri==entity_uri && c.label==property_name) {
            members.+= (m)
          }        
        }
@@ -78,16 +80,17 @@ case class PropertyClusters(var clusters: Traversable[PropertyCluster] ){
          //update the cluster id and reset the doubt counter in the members  
          tableColumn.members.foreach { m =>
             m.cluster_id=cluster_id
+            m.property_name=c.label
             m.schema_errors.doubts=0
           }
-         c.tableColumns = c.tableColumns ++ Seq(PropertyClusterTableColumn(cluster_id, tableColumn.table_id, tableColumn.members))
+         c.tableColumns = c.tableColumns ++ Seq(PropertyClusterTableColumn(cluster_id, tableColumn.table_id, tableColumn.table_column_id, tableColumn.correct_label,  tableColumn.members))
         }
      }
    }
    
    def recluster(tableColumn:PropertyClusterTableColumn,  new_cluster_id:String) = {
      
-     println("Cluster Member:"+tableColumn+" is moved to cluster with id "+new_cluster_id)
+     println("Cluster Member:"+tableColumn.cluster_id+"--"+tableColumn.table_id+" is moved to cluster with id "+new_cluster_id)
      //delete from initial locations
      deleteMember (tableColumn)
      
@@ -111,6 +114,7 @@ case class PropertyClusters(var clusters: Traversable[PropertyCluster] ){
              val PropertyRegex = """.*<([^>]*)>""".r
              var PropertyRegex(property_name) = wp.toString()
              
+             //TODO check. is that always right?
              var candidate_cluster_members = locateMember(e.source.uri, property_name)
              
              for (c <- candidate_cluster_members) {
@@ -133,21 +137,60 @@ case class PropertyClusters(var clusters: Traversable[PropertyCluster] ){
      
      //recluster per table
      for ( tableColumn <- toBeReclustered) {       
-       //TODO replace the random reclustering
-       var random_id = scala.util.Random.nextInt(clusters.size-1) //index starts from 0
-       //new cluster id should not be equal with the current cluster id
-       while (random_id.equals(tableColumn.cluster_id.toInt)) random_id = scala.util.Random.nextInt(clusters.size-1)
-       var new_random_cluster = random_id 
-
-       recluster(tableColumn, new_random_cluster.toString())  
+       var new_cluster= findAppropriateCluster(tableColumn)
+       recluster(tableColumn, new_cluster.toString())  
        for (m <- tableColumn.members)
-         feedback += ((m,tableColumn.cluster_id, new_random_cluster.toString()))
+         feedback += ((m,tableColumn.cluster_id, new_cluster.toString()))
        
      }
      feedback
    }
    
+   /**
+ * @param tableColumn
+ * @return
+ * Decide where to recluster the tableColumn
+ * Based on extended Jaccard for lists 
+ */
+  def findAppropriateCluster(tableColumn: PropertyClusterTableColumn) : Integer =  {
+
+    var values_tableColumn = tableColumn.members.flatMap(_.property_values)
+
+    var max_similarity = -1.0
+    var fittest_cluster = -1
+    var intercluster_similarity = -1.0
+    
+    for (c <- clusters) {
+      if ( !c.index.equals(tableColumn.cluster_id)) {
+        var values_cluster = c.tableColumns.flatMap(_.members.flatMap(_.property_values))
+        //TODO soft as double and not integer. It has to be proportionate to the average size of the values
+        var similarity = 1 - new SoftJaccardDistance(3).apply(values_tableColumn, values_cluster)
+
+        if (similarity> max_similarity) {
+          max_similarity = similarity
+          fittest_cluster = c.index.toInt
+        }
+      }
+      else {
+        var values_same_cluster = c.tableColumns.filterNot(_.equals(tableColumn))flatMap(_.members.flatMap(_.property_values))
+        intercluster_similarity = 1 - new SoftJaccardDistance(3).apply(values_tableColumn, values_same_cluster)
+      }
+    }
+    fittest_cluster
+   }
    
+  /**
+ * @param tableColumn
+ * @return
+ * Choose a random cluster to recluster the current table column
+ */
+def findRandomCluster(tableColumn: PropertyClusterTableColumn) : Integer =  {
+       var random_id = scala.util.Random.nextInt(clusters.size-1) //index starts from 0
+       //new cluster id should not be equal with the current cluster id
+       while (random_id.equals(tableColumn.cluster_id.toInt)) random_id = scala.util.Random.nextInt(clusters.size-1)
+       
+       random_id
+  }
   /**
  * @param tableColumn
  * @return
@@ -160,6 +203,35 @@ def doubtCondition (tableColumn: PropertyClusterTableColumn) :Boolean = {
     
    }
    
+   def updateEntitiesWithSchemaInfo(refEntities: ReferenceEntities) : ReferenceEntities = {
+
+    var entity_members = clusters.flatMap(_.tableColumns).flatMap(_.members).groupBy(m => m.entity_uri)
+    
+    for (e <- refEntities.positive ++ refEntities.negative){
+      
+      var entity = e._2.source
+
+      var membersofEntity = entity_members.get(entity.uri).get
+      //initialize
+      entity.valuesOfColumns = Some({
+        for (i <- 0 to entity.values.length-1) yield {
+          
+          var membersOfthisPath = membersofEntity.filter(_.cluster_id.toInt == i)
+          var valuesWithSchemaInfo  = Set[(String, Integer)]()
+          for (m <- membersOfthisPath) {
+            for (v <- m.property_values)
+            valuesWithSchemaInfo += ((v, m.table_column_id))
+          }
+          
+          valuesWithSchemaInfo
+        }
+      }.toIndexedSeq)
+      
+      
+    }
+    
+    refEntities
+   }
 }
 
 
@@ -183,7 +255,8 @@ object PropertyClusters {
         val cluster_id = cluster \ "index" text
         
         val tables = for (t <- cluster \ "table_column") yield {
-          
+          var table_col_id = (t \ "table_column_id" text).toInt
+          var correct_label = t \ "correct_predicate" text
           
           val members = for(m <- t \ "members" \ "member") yield {
           new PropertyClusterMember (
@@ -193,6 +266,8 @@ object PropertyClusters {
             property_name = m \ "property_name" text,
             table_id = t \ "table_id" text,
             property_values =  (for(v <- m \ "property_values" \ "Val" ) yield v \ "e" text).toSet ,
+            table_column_id = table_col_id,
+            correct_predicate = correct_label,
             schema_errors = new SchemaErrors(doubts = 0)
             )
           
@@ -200,8 +275,11 @@ object PropertyClusters {
           new PropertyClusterTableColumn (
             cluster_id = cluster_id,
             table_id = t \ "table_id" text,
+            table_column_id =table_col_id,
+            correct_label = correct_label,
             members = members
           )
+          
         }
         
         
@@ -223,11 +301,11 @@ case class PropertyCluster (index: String = "",
   
 }
 
-case class PropertyClusterTableColumn(var cluster_id:String="", table_id:String="", var members: Traversable[PropertyClusterMember] ) {
+case class PropertyClusterTableColumn(var cluster_id:String="", table_id:String= "", table_column_id:Integer, correct_label:String, var members: Traversable[PropertyClusterMember] ) {
   
 }
                             
-case class PropertyClusterMember(var cluster_id: String="", entity_uri: String="", property_name:String ="", var table_id:String="", var property_values:Set[String]= Set[String](), schema_errors:SchemaErrors =  SchemaErrors())
+case class PropertyClusterMember(var cluster_id: String="", entity_uri: String="", var property_name:String ="", var correct_predicate:String ="", var table_id:String = "" , var table_column_id:Integer=0, var property_values:Set[String]= Set[String](), schema_errors:SchemaErrors =  SchemaErrors())
 
 case class SchemaErrors (var doubts: Int=0) {
   

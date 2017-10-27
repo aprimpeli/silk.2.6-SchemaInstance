@@ -18,7 +18,7 @@ import scala.collection.mutable.HashMap
 import scala.collection.mutable.ArrayBuffer
 import java.io.File
 import de.fuberlin.wiwiss.silk.workspace.io.PropertyClusterImporter
-import de.fuberlin.wiwiss.silk.workspace.modules.linking.{PropertyClusters, SchemaAnalyzer}
+import de.fuberlin.wiwiss.silk.workspace.modules.linking.{PropertyClusters, SchemaAnalyzer, SchemaClustersEvaluator}
 import de.fuberlin.wiwiss.silk.workspace.User
 import de.fuberlin.wiwiss.silk.util.XMLUtils
 
@@ -62,11 +62,11 @@ class ActiveLearningEvaluator(config: LearningConfiguration,
 
   val numRuns = 1
 
-  val maxLinks =40
+  val maxLinks =30
 
-  val maxPosRefLinks = 80
+  val maxPosRefLinks = 40
 
-  val maxNegRefLinks = 800
+  val maxNegRefLinks = 200
     
   val schemaMatching = true
   
@@ -75,7 +75,7 @@ class ActiveLearningEvaluator(config: LearningConfiguration,
     
     //create property clusters file and objects
     var clustersFile = new File ("C:/Users/User/.silk/workspace/"+ds.name+"/linking/"+ds.name+"/propertyClusters.xml")
-    var sourceFile = new File ("C:/Users/User/.silk/workspace/"+ds.name+"/resources/source")
+    var sourceFile = new File ("C:/Users/User/.silk/workspace/"+ds.name+"/resources/source_schema")
     var property_index = ds.task.cache.referenceEntitiesCache.value.negative.head._2.source.desc.paths
     var loadedClusters = PropertyClusterImporter.loadInfoForXML(sourceFile, property_index)
     PropertyClusterImporter.writeXML(loadedClusters, clustersFile)
@@ -112,6 +112,11 @@ class ActiveLearningEvaluator(config: LearningConfiguration,
     
     var referenceEntities = ReferenceEntities()
     var entities = ds.task.cache.entities
+
+    //add column ids in the values of entities. Required for reclustering
+    if (schemaMatching)
+      entities = propertyClusters.get.updateEntitiesWithSchemaInfo(entities)
+      
     var entity_source_desc = entities.negative.head._2.source.desc
     var entity_target_desc = entities.negative.head._2.target.desc
     //initialize the schema analyzer
@@ -206,13 +211,13 @@ class ActiveLearningEvaluator(config: LearningConfiguration,
         //evaluate reclustering condition and recluster the member of which the condition is met
         var reclusturedMembers = propertyClusters.get.evaluateReclusteringCondition()
         //consider the changes in the clusters and update the schema information of the current entities (reference, validation, pool)
-        for (rc <- reclusturedMembers) {
-        
+        for (rc <- reclusturedMembers) {       
             entities.negative.values.filter(_.source.uri.equals(rc._1.entity_uri)).foreach(p => p.source.update(rc._2.toInt, rc._1.property_values, rc._3.toInt))
             entities.positive.values.filter(_.source.uri.equals(rc._1.entity_uri)).foreach(p => p.source.update(rc._2.toInt, rc._1.property_values, rc._3.toInt))
-         
         }
         
+        
+        println("Schema Matching Result:"+SchemaClustersEvaluator(propertyClusters.get))
       }
 
 //      if(valScores.fMeasure > 0.999) {

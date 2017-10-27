@@ -42,9 +42,9 @@ import de.uni_mannheim.informatik.dws.winter.similarity.string.JaccardOnNGramsSi
  */
 case class SchemaAnalyzer (var source_desc:EntityDescription, var target_desc:EntityDescription){
   
-  val source_properties = source_desc.paths.flatMap(_.operators)
-  val target_properties = target_desc.paths.flatMap(_.operators)   
-  val sourceToTargetOperators = mapOperators()
+  var source_properties = source_desc.paths.flatMap(_.operators)
+  var target_properties = target_desc.paths.flatMap(_.operators)   
+  var sourceToTargetOperators = mapOperators()
   
   def analyzeSchemaOfEntityPair (rule: LinkageRule, training_result: EvaluationResult, e: DPair[Entity]) : Set[PathOperator] = {
            
@@ -119,7 +119,7 @@ case class SchemaAnalyzer (var source_desc:EntityDescription, var target_desc:En
      for  (sourceIndex <- 0 until source_properties.length)  {
        var currentProp = source_properties(sourceIndex)
        
-       //should be calculated only once
+
        var targetIndex = sourceToTargetOperators.get(currentProp)
      
        //TODO targetIndex>0 this is because silk restrits to the top x dense properties. So a source path may not be contained in the catalog paths

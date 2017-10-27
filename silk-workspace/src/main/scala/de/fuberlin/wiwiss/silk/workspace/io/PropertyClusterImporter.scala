@@ -4,8 +4,8 @@ import io.Source
 import de.fuberlin.wiwiss.silk.entity.{Entity, EntityDescription, Path}
 import de.fuberlin.wiwiss.silk.workspace.modules.linking.{PropertyCluster,PropertyClusterMember,SchemaErrors, PropertyClusterTableColumn}
 import de.fuberlin.wiwiss.silk.util.XMLUtils
-import java.io.File
 import xml.NodeSeq
+import java.io.File
 
 object PropertyClusterImporter {
   
@@ -23,16 +23,25 @@ object PropertyClusterImporter {
     //create cluster objects out of member objects
     var clusters = Traversable[PropertyCluster]()
     
-    var tableColumns = propertyClusterMembers.groupBy(member => (member.cluster_id, member.property_name, member.table_id))
+    var tableColumns = propertyClusterMembers.groupBy(member => (member.cluster_id, member.property_name, member.table_id, member.correct_predicate))
+    var table_column_id = 0;
+
     for ((tableKey, members) <- tableColumns){
-      var column = new PropertyClusterTableColumn(tableKey._1, tableKey._3, members)
+      table_column_id += 1
+      
+      var column = new PropertyClusterTableColumn(
+          cluster_id = tableKey._1,
+          table_id =  tableKey._3, 
+          correct_label = tableKey._4,
+          members = members,
+          table_column_id = table_column_id)
       
       var existingCluster = clusters.filter(c => c.index == column.cluster_id)
       if (existingCluster.isEmpty) {
-        clusters = clusters ++ Seq(new PropertyCluster(tableKey._1, tableKey._2, Seq(PropertyClusterTableColumn(column.cluster_id, column.table_id, column.members) )))
+        clusters = clusters ++ Seq(new PropertyCluster(tableKey._1, tableKey._2, Seq(PropertyClusterTableColumn(column.cluster_id, column.table_id, column.table_column_id, column.correct_label, column.members) )))
       }
       //TODO: head because there cant be two clusters with the same id - but consider implementing ids
-      else existingCluster.head.tableColumns = existingCluster.head.tableColumns ++ Seq(PropertyClusterTableColumn(column.cluster_id, column.table_id, column.members) )
+      else existingCluster.head.tableColumns = existingCluster.head.tableColumns ++ Seq(PropertyClusterTableColumn(column.cluster_id, column.table_id, column.table_column_id, column.correct_label, column.members) )
     }
     
     clusters
@@ -65,25 +74,33 @@ object PropertyClusterImporter {
    }
    
    
-  private val NTriplesRegex = """<([^>]*)>\s*<([^>]*)>\s*[<"]?([^>]*)[>"].*""".r
+  private val NTriplesRegex = """<([^>]*)>\s*<([^>]*)>\s*[<"]?([^>]*)[>"].*<([^>]*)>*""".r
   private val domainRegex = """http:\/\/([^\/]+)\/.*""".r
 
   def readNTriples(source: Source, index:IndexedSeq[String]) : Set[PropertyClusterMember] = {    
     var members = Set[PropertyClusterMember]()
     var entities_tablesIDs = Map[String, String]()
     
+    
     for (line <- source.getLines)  {
-      var NTriplesRegex(subject_, predicate_, object_) = line
-
+      var NTriplesRegex(subject_, predicate_, object_, correct_predicate_) = line
       if (predicate_.contains("url")) {
-        var domainRegex(domain) = object_
-        entities_tablesIDs += (subject_ -> domain)
+//        if(!domainRegex.pattern.matcher(object_).matches())
+//          println("Problematic:"+object_)
+//         else{
+            var domainRegex(domain) = object_
+            entities_tablesIDs += (subject_ -> domain)
+//         }
       }
       else {
         var existing = members.filter(p => p.entity_uri.equals(subject_) && p.property_name.equals(predicate_))
         var member = PropertyClusterMember()
         if (existing.size==0) {
-          member = new PropertyClusterMember(index.indexOf(predicate_).toString(), subject_, predicate_, "defaultID", Set[String](), SchemaErrors())
+          member = new PropertyClusterMember(
+              cluster_id =index.indexOf(predicate_).toString(), 
+              entity_uri = subject_,
+              property_name = predicate_, 
+              correct_predicate = correct_predicate_)
         }
         else {
           member = existing.head
@@ -118,7 +135,9 @@ object PropertyClusterImporter {
 		    var tableColumns_ = c.tableColumns
 		    for (t <- tableColumns_) yield {
 		      <table_column>
+					<table_column_id>{t.table_column_id}</table_column_id>
 		      <table_id>{t.table_id}</table_id>
+					<correct_predicate>{t.correct_label}</correct_predicate>
 				  <members>
 
   				{for (m <- t.members) yield {
