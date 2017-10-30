@@ -58,6 +58,7 @@ class Entity(val uri: String, var values: IndexedSeq[(Set[String])] ,   val desc
     }
   }
   
+  //update both values and valuesOfColumn
   def update(oldIndex: Int, valuesReassign: Set[String], newIndex: Int) = {
     
     var filtered = Set[String] ()
@@ -78,9 +79,34 @@ class Entity(val uri: String, var values: IndexedSeq[(Set[String])] ,   val desc
     values = newvalues
     
   }
+  
+  def updateAfterReclustering (oldIndex: Int, newIndex: Int, columnId: Integer) = {
+          
+     var filteredSet = valuesOfColumns.get(oldIndex).filter(_._2.equals(columnId))
+     println("Values that need to be moved:"+filteredSet)
+
+     var newColumnIDValues = for (i<- 0 to valuesOfColumns.get.size-1) yield {       
+        if (i==oldIndex){
+         valuesOfColumns.get(i).--(filteredSet)  
+        }
+        else if (i == newIndex){
+         valuesOfColumns.get(i).++(filteredSet)
+        }
+        else valuesOfColumns.get(i)
+      }
+      
+     valuesOfColumns = Some(newColumnIDValues)
+     
+     var newValues = for (columnValues <- valuesOfColumns.get) yield {
+       for (v <- columnValues) yield v._1
+     }
+     
+     values = newValues
+
+   }
 }
 
-  
+ 
 
 object Entity {
   def fromXML(node: Node, desc: EntityDescription) = {

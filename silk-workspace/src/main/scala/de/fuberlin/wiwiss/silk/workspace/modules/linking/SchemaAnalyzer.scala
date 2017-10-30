@@ -46,21 +46,21 @@ case class SchemaAnalyzer (var source_desc:EntityDescription, var target_desc:En
   var target_properties = target_desc.paths.flatMap(_.operators)   
   var sourceToTargetOperators = mapOperators()
   
-  def analyzeSchemaOfEntityPair (rule: LinkageRule, training_result: EvaluationResult, e: DPair[Entity]) : Set[PathOperator] = {
+  def analyzeSchemaOfEntityPair (rule: LinkageRule, training_result: EvaluationResult, e: DPair[Entity]) : Set[Integer] = {
            
        var source_entity = e.source.uri
-       var possibly_wrong_properties = Set[PathOperator]()
+       var possibly_wrong_table_columns = Set[Integer]()
               
        //exploit the information from the properties belonging to the linkage rule
        var comparatorsInfo = getComparatorsInfo(e, rule, training_result)
-       possibly_wrong_properties = comparatorsInfo._1
+       possibly_wrong_table_columns = comparatorsInfo._1
        var checked_properties = comparatorsInfo._2
              
-       //now exploit the rest of the properties for the entities that are annotated as positive matches
+       //now exploit the rest of the properties for the entities as it is annotated as positive matches
        var positiveMatchesInfo = getPositiveMatchesInfo(e, checked_properties)
-       possibly_wrong_properties = possibly_wrong_properties ++ positiveMatchesInfo
+       possibly_wrong_table_columns = possibly_wrong_table_columns ++ positiveMatchesInfo
        
-      possibly_wrong_properties
+      possibly_wrong_table_columns
   }
   
   def mapOperators() : Map[PathOperator,Integer] = {
@@ -79,69 +79,105 @@ case class SchemaAnalyzer (var source_desc:EntityDescription, var target_desc:En
      mapping
    }
   
-  def getComparatorsInfo (e:DPair[Entity] , rule: LinkageRule, training_result: EvaluationResult) : (Set[PathOperator],Set[PathOperator])= {
+  def getComparatorsInfo (e:DPair[Entity] , rule: LinkageRule, training_result: EvaluationResult) : (Set[Integer],Set[PathOperator])= {
      
-     var possibly_wrong_properties = Set[PathOperator]()
-     var checked_properties = Set[PathOperator]()
+     var possibly_wrong_tableColumns = Set[Integer]()
+     var checked_table_columns = Set[PathOperator]()
+    
      
      for (operator <- rule.comparison_operators) {
          //TODO check if this the real threshold
-         var result = operator.apply(e, operator.threshold)
          var property = operator.inputs.source
-         checked_properties = checked_properties ++ (property.getPropertyPaths()) //keep track of the properties that are not part of the linkage rule
-         //if the result for this specific operator is different than it should be
-         //heuristic consider the false negatives for schema reclustering if the rule is good (training result is high)
-         if (training_result.fMeasure>0.5){
-           if (result.isDefined && ((result.get>0.0 && training_result.falsePositiveEntities.get.contains(e)) 
-             || (result.get<0.0 && training_result.falseNegativeEntities.get.contains(e)))) {       
-            possibly_wrong_properties = possibly_wrong_properties ++ (property.getPropertyPaths())    
-         }
-         }
          
+         //split the current entity if the current properties contain more than one table columns
+         for (path <- property.getPropertyPaths()){
+
+           var index_of_path = source_properties.indexOf(path)
+           var values_by_column = e._1.valuesOfColumns.get(index_of_path).groupBy(_._2)
+           
+           for (values <- values_by_column){
+
+             var valuesOfCurrentColumn = for (v <- values._2) yield { v._1 }
+             var currentColumnId = values._1
+             
+             var updatedValues = for (i <- 0 to e.source.values.length-1) yield {
+               if (i.equals(index_of_path))
+                 valuesOfCurrentColumn
+               else e.source.values(i)
+             }
+             
+             var tempEntity = new DPair[Entity](
+               source = new Entity(e._1.uri, updatedValues, e._1.desc, e._1.valuesOfColumns),
+               target = new Entity(e._2.uri, e._2.values, e._2.desc)
+             )
+               
+             
+             var result = operator.apply(tempEntity, operator.threshold)
+        
+             //if the result for this specific operator is different than it should be
+             //heuristic consider the false negatives for schema reclustering if the rule is good (training result is high)
+             if (training_result.fMeasure>0.5){
+               if (result.isDefined && ((result.get>0.0 && training_result.falsePositiveEntities.get.contains(e)) 
+                 || (result.get<0.0 && training_result.falseNegativeEntities.get.contains(e)))) {       
+                possibly_wrong_tableColumns += currentColumnId    
+             }
+             }
+
+             //TODO: is this a good idea?
+//             //raise a doubt if there are true positives but the source cluster id and the target property do not match
+//             //heuristic consider the true positives for schema reclustering if the rule is bad (training result is low)
+//             if (training_result.fMeasure<0.5){
+//               if (result.isDefined && ((result.get>0.0 && training_result.truePositiveEntities.get.contains(e))) ){     
+//                 if (operator.inputs.source.getPropertyPaths().size>1 || operator.inputs.target.getPropertyPaths().size>1)
+//                   println("This should not happen. CHECK!")
+//                 if (!operator.inputs.source.getPropertyPaths().head.equals(operator.inputs.target.getPropertyPaths().head))
+//                   possibly_wrong_tableColumns += currentColumnId
+//               }
+//             }  
+           } // for every table columns
+        checked_table_columns += path //keep track of the properties that are not part of the linkage rule
+
+         } //for every path 
+          
+     } // for every operator
+     (possibly_wrong_tableColumns, checked_table_columns)
+  } 
          
-         //raise a doubt if there are true positives but the source cluster id and the target property do not match
-         //heuristic consider the true positives for schema reclustering if the rule is bad (training result is low)
-         if (training_result.fMeasure<0.5){
-           if (result.isDefined && ((result.get>0.0 && training_result.truePositiveEntities.get.contains(e))) ){     
-             if (operator.inputs.source.getPropertyPaths().size>1 || operator.inputs.target.getPropertyPaths().size>1)
-               println("This should not happen. CHECK!")
-             if (!operator.inputs.source.getPropertyPaths().head.equals(operator.inputs.target.getPropertyPaths().head))
-               possibly_wrong_properties = possibly_wrong_properties ++ (property.getPropertyPaths())
-           }
-         }  
-       }
-     (possibly_wrong_properties, checked_properties)
-   }
-  
-  def getPositiveMatchesInfo (e: DPair[Entity], checked_properties:Set[PathOperator]) : Set[PathOperator] = {
      
-     var possibly_wrong_props =  Set[PathOperator]()
+   
+  
+//TODO
+  def getPositiveMatchesInfo (e: DPair[Entity], checked_paths:Set[PathOperator]) : Set[Integer] = {
+     
+     var possibly_wrong_table_columns =  Set[Integer]()
      for  (sourceIndex <- 0 until source_properties.length)  {
        var currentProp = source_properties(sourceIndex)
-       
-
-       var targetIndex = sourceToTargetOperators.get(currentProp)
+       if (!checked_paths.contains(currentProp)){
+         var targetIndex = sourceToTargetOperators.get(currentProp)
      
        //TODO targetIndex>0 this is because silk restrits to the top x dense properties. So a source path may not be contained in the catalog paths
        if (targetIndex.isDefined) {
+         for (values <- e.source.valuesOfColumns.get(sourceIndex).groupBy(_._2)){
          
-         if (!checked_properties.contains(currentProp)){
-           var sourceValues = e.source.values(sourceIndex)
-           var targetValues = e.target.values(targetIndex.get)
-           //compare only if both are non null
-           if (!sourceValues.isEmpty && !targetValues.isEmpty){
-             //TODO empty string fix
-             if (sourceValues.head.length()>0 && targetValues.head.length()>0){
-               var jaccardOnBigrams = new JaccardOnNGramsSimilarity(2);
-               //TODO different for every datatype (also single values vs lists)
-               var result = jaccardOnBigrams.calculate(sourceValues.head, targetValues.head)
-               if (result<0.5) possibly_wrong_props += currentProp
+             var sourceValues = for (v <- values._2) yield { v._1 }
+             var targetValues = e.target.values(targetIndex.get)
+             //compare only if both are non null
+             if (!sourceValues.isEmpty && !targetValues.isEmpty){
+               //TODO empty string fix
+               if (sourceValues.head.length()>0 && targetValues.head.length()>0){
+                 var jaccardOnBigrams = new JaccardOnNGramsSimilarity(2);
+                 //TODO different for every datatype (also single values vs lists)
+                 var result = jaccardOnBigrams.calculate(sourceValues.head, targetValues.head)
+                 if (result<0.5) possibly_wrong_table_columns += values._1
+               }
              }
-           }
            
-         }        
+         }  
        }
-     }
-     possibly_wrong_props
+         
+       }
+       
+     } // for every property
+     possibly_wrong_table_columns
    }
 }

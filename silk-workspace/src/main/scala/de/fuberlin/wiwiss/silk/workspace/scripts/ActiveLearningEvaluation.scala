@@ -62,13 +62,15 @@ class ActiveLearningEvaluator(config: LearningConfiguration,
 
   val numRuns = 1
 
-  val maxLinks =30
+  val maxLinks =10
 
-  val maxPosRefLinks = 40
+  val maxPosRefLinks = 5
 
-  val maxNegRefLinks = 200
+  val maxNegRefLinks = 15
     
   val schemaMatching = true
+  
+  val schemaMatchingIterations = 0
   
   
   def createPropertyClusters(){
@@ -212,8 +214,8 @@ class ActiveLearningEvaluator(config: LearningConfiguration,
         var reclusturedMembers = propertyClusters.get.evaluateReclusteringCondition()
         //consider the changes in the clusters and update the schema information of the current entities (reference, validation, pool)
         for (rc <- reclusturedMembers) {       
-            entities.negative.values.filter(_.source.uri.equals(rc._1.entity_uri)).foreach(p => p.source.update(rc._2.toInt, rc._1.property_values, rc._3.toInt))
-            entities.positive.values.filter(_.source.uri.equals(rc._1.entity_uri)).foreach(p => p.source.update(rc._2.toInt, rc._1.property_values, rc._3.toInt))
+            entities.negative.values.filter(_.source.uri.equals(rc._1.entity_uri)).foreach(p => p.source.updateAfterReclustering(rc._2.toInt,  rc._3.toInt, rc._1.table_column_id))
+            entities.positive.values.filter(_.source.uri.equals(rc._1.entity_uri)).foreach(p => p.source.updateAfterReclustering(rc._2.toInt,  rc._3.toInt, rc._1.table_column_id))
         }
         
         
@@ -247,7 +249,7 @@ class ActiveLearningEvaluator(config: LearningConfiguration,
   
   def enoughConfidence(iterations:Integer):Boolean ={
     //TODO change the confidence condition
-    if (iterations > 5) true
+    if (iterations > schemaMatchingIterations) true
     else false
   }
 }

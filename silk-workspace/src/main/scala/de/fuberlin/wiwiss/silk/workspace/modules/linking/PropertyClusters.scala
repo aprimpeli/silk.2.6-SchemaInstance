@@ -45,20 +45,11 @@ import de.fuberlin.wiwiss.silk.evaluation.ReferenceEntities
 case class PropertyClusters(var clusters: Traversable[PropertyCluster] ){
   
   //a member can be part of more than one clusters
-  def locateMember(entity_uri:String, property_name:String) : Set[PropertyClusterMember] = {
+  def locateMember(entity_uri:String, table_column_id:Integer) : Set[PropertyClusterMember] = {
      
      var members =  Set[PropertyClusterMember]()
    
-    var example =  for (c <- clusters) yield {
-      for (t <- c.tableColumns) yield {
-        for (m <- t.members) yield {
-         if (m.entity_uri==entity_uri && c.label==property_name) {
-           members.+= (m)
-         }        
-       }
-      }
-       
-     }
+    members = clusters.flatMap(_.tableColumns).filter(_.table_column_id.equals(table_column_id)).flatMap(_.members).filter(_.entity_uri.equals(entity_uri)).toSet
      
     members
   }
@@ -105,17 +96,13 @@ case class PropertyClusters(var clusters: Traversable[PropertyCluster] ){
      rule.getComparisonOperators()
      
      for (e <- training_result.falseNegativeEntities.get ++ training_result.truePositiveEntities.get) {
-          var possibly_wrong_properties = schemaAnalyzer.analyzeSchemaOfEntityPair(rule, training_result, e)
+          var possibly_wrong_table_columns = schemaAnalyzer.analyzeSchemaOfEntityPair(rule, training_result, e)
           
           //we believe that falsePositives cannot give any information on schema reclustering
-          for (wp <- possibly_wrong_properties) {
+          for (table_column_id <- possibly_wrong_table_columns) {
                 
-             //normalize the property name as it is in the form of path
-             val PropertyRegex = """.*<([^>]*)>""".r
-             var PropertyRegex(property_name) = wp.toString()
-             
              //TODO check. is that always right?
-             var candidate_cluster_members = locateMember(e.source.uri, property_name)
+             var candidate_cluster_members = locateMember(e.source.uri, table_column_id)
              
              for (c <- candidate_cluster_members) {
                if (!c.cluster_id.equals("")) {
@@ -194,7 +181,7 @@ def findRandomCluster(tableColumn: PropertyClusterTableColumn) : Integer =  {
   /**
  * @param tableColumn
  * @return
- * current reclustering condition if there at least 10% with at least two raised doubts
+ * current reclustering condition if there at least 10% members of the table column with at least two raised doubts
  */
 def doubtCondition (tableColumn: PropertyClusterTableColumn) :Boolean = { 
   
